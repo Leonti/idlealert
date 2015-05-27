@@ -1,15 +1,15 @@
 package rocks.leonti.idlealert;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
-import android.content.BroadcastReceiver;
-import android.content.ComponentName;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.ServiceConnection;
-import android.os.Handler;
-import android.os.IBinder;
+import android.util.Log;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -22,6 +22,8 @@ import rocks.leonti.idlealert.model.MiBand;
 
 public class MiBandReader {
 
+    private static String TAG = MiBandReader.class.getSimpleName();
+
     interface OnDataUpdateCallback {
         void onDataUpdate(MiBand miBand);
     }
@@ -31,160 +33,161 @@ public class MiBandReader {
     }
 
     private final Context context;
-    private final Handler handler;
     private final OnDataUpdateCallback onDataUpdateCallback;
     private final OnErrorCallback onErrorCallback;
     private MiBand mMiBand = new MiBand();
-
-    private BluetoothLeService mBluetoothLeService;
 
     private Map<UUID, BluetoothGattCharacteristic> map = new HashMap<UUID, BluetoothGattCharacteristic>();
 
     private String DEVICE_ADDRESS = "88:0F:10:64:62:9E";
     private int count = 0;
 
-    public MiBandReader(Context context, Handler handler, OnDataUpdateCallback onDataUpdateCallback, OnErrorCallback onErrorCallback) {
+    public MiBandReader(Context context, OnDataUpdateCallback onDataUpdateCallback, OnErrorCallback onErrorCallback) {
         this.context = context;
-        this.handler = handler;
         this.onDataUpdateCallback = onDataUpdateCallback;
         this.onErrorCallback = onErrorCallback;
-        context.registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
     }
 
     void refresh() {
-
-        if (mBluetoothLeService == null) {
-            Intent gattServiceIntent = new Intent(context, BluetoothLeService.class);
-            context.bindService(gattServiceIntent, mServiceConnection, context.BIND_AUTO_CREATE);
-
-        } else if (!mBluetoothLeService.isConnected()) {
-            mBluetoothLeService.connect(DEVICE_ADDRESS);
-        } else {
-            getGattService(mBluetoothLeService.getMiliService());
-        }
+        connect(DEVICE_ADDRESS);
     }
 
-    private final ServiceConnection mServiceConnection = new ServiceConnection() {
+    public boolean connect(final String address) {
 
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder service) {
-            mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
-            if (!mBluetoothLeService.initialize()) {
-
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        onErrorCallback.onError("Unable to initialize Bluetooth");
-                    }
-                });
-            }
-            mBluetoothLeService.connect(DEVICE_ADDRESS);
+        BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bluetoothManager == null) {
+            Log.e(TAG, "Unable to initialize BluetoothManager.");
+            return false;
         }
 
-        @Override
-        public void onServiceDisconnected(ComponentName componentName) {
-            mBluetoothLeService = null;
+        BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+        if (bluetoothAdapter == null) {
+            Log.e(TAG, "Unable to obtain a BluetoothAdapter.");
+            return false;
         }
-    };
 
-    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-            if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
-                getGattService(mBluetoothLeService.getMiliService());
-            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-                BluetoothGattCharacteristic characteristic;
-                byte[] val = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
-                if (val != null && val.length > 0) {
-                    switch (count) {
-                        case 0:
-                            byte[] version = Arrays.copyOfRange(val, val.length - 4, val.length);
-                            mMiBand.setFirmware(version);
-                            count++;
-                            characteristic = map.get(BluetoothLeService.UUID_DEVICE_NAME);
-                            mBluetoothLeService.readCharacteristic(characteristic);
-                            break;
-                        case 1:
-                            mMiBand.setName(new String(val));
-                            count++;
-                            characteristic = map.get(BluetoothLeService.UUID_REALTIME_STEPS);
-                            mBluetoothLeService.readCharacteristic(characteristic);
-                            break;
-                        case 2:
-                            mMiBand.setSteps(0xff & val[0] | (0xff & val[1]) << 8);
-                            count++;
-                            characteristic = map.get(BluetoothLeService.UUID_LE_PARAMS);
-                            mBluetoothLeService.readCharacteristic(characteristic);
-                            break;
-                        case 3:
-                            LeParams params = LeParams.fromByte(val);
-                            mMiBand.setLeParams(params);
-                            count++;
-                            characteristic = map.get(BluetoothLeService.UUID_BATTERY);
-                            mBluetoothLeService.readCharacteristic(characteristic);
-                            break;
-                        case 4:
-                            Battery battery = Battery.fromByte(val);
-                            mMiBand.setBattery(battery);
-                            mBluetoothLeService.disconnect();
-                            count = 0;
+        final BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
+        if (device == null) {
+            Log.v(TAG, "Device not found.  Unable to connect.");
+            return false;
+        }
 
-                            onDataUpdateCallback.onDataUpdate(mMiBand);
-                            //handler.post(new Runnable() {
-                                //@Override
-                               // public void run() {
-                               //     onDataUpdateCallback.onDataUpdate(mMiBand);
-                             //   }
-                           // });
-                            break;
-                    }
+        device.connectGatt(context, false, new BluetoothGattCallback() {
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    Log.v(TAG, "Connected to GATT server.");
+                    Log.v(TAG, "Attempting to start service discovery:" + gatt.discoverServices());
+
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    Log.v(TAG, "Disconnected from GATT server.");
                 }
             }
-        }
-    };
 
-    private void getGattService(BluetoothGattService service) {
-        if (service == null) return;
+            @Override
+            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    startReading(gatt);
+                } else {
+                    Log.v(TAG, "onServicesDiscovered received: " + status);
+                }
+            }
 
-        BluetoothGattCharacteristic characteristic;
+            @Override
+            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    readData(gatt, characteristic.getValue());
+                }
+            }
 
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_DEVICE_NAME);
-        map.put(characteristic.getUuid(), characteristic);
+            @Override
+            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                Log.i(TAG, "Characteristic changed!");
+            }
 
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_USER_INFO);
-        map.put(characteristic.getUuid(), characteristic);
+        });
 
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_CONTROL_POINT);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_REALTIME_STEPS);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_ACTIVITY);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_LE_PARAMS);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_BATTERY);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_PAIR);
-        map.put(characteristic.getUuid(), characteristic);
-
-        characteristic = service.getCharacteristic(BluetoothLeService.UUID_INFO);
-        map.put(characteristic.getUuid(), characteristic);
-        mBluetoothLeService.readCharacteristic(characteristic);
+        return true;
     }
 
-    private static IntentFilter makeGattUpdateIntentFilter() {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
-        return intentFilter;
+    private void readData(BluetoothGatt gatt, byte[] val) {
+        BluetoothGattCharacteristic characteristic;
+        if (val != null && val.length > 0) {
+            switch (count) {
+                case 0:
+                    byte[] version = Arrays.copyOfRange(val, val.length - 4, val.length);
+                    mMiBand.setFirmware(version);
+                    count++;
+                    characteristic = map.get(MiBandConstants.UUID_DEVICE_NAME);
+                    gatt.readCharacteristic(characteristic);
+                    break;
+                case 1:
+                    mMiBand.setName(new String(val));
+                    count++;
+                    characteristic = map.get(MiBandConstants.UUID_REALTIME_STEPS);
+                    gatt.readCharacteristic(characteristic);
+                    break;
+                case 2:
+                    mMiBand.setSteps(0xff & val[0] | (0xff & val[1]) << 8);
+                    count++;
+                    characteristic = map.get(MiBandConstants.UUID_LE_PARAMS);
+                    gatt.readCharacteristic(characteristic);
+                    break;
+                case 3:
+                    LeParams params = LeParams.fromByte(val);
+                    mMiBand.setLeParams(params);
+                    count++;
+                    characteristic = map.get(MiBandConstants.UUID_BATTERY);
+                    gatt.readCharacteristic(characteristic);
+                    break;
+                case 4:
+                    Battery battery = Battery.fromByte(val);
+                    mMiBand.setBattery(battery);
+                    gatt.disconnect();
+                    count = 0;
+
+                    onDataUpdateCallback.onDataUpdate(mMiBand);
+                    gatt.disconnect();
+                    gatt.close();
+                    break;
+            }
+        }
+    }
+
+    private void startReading(BluetoothGatt gatt) {
+        fillMap(gatt.getService(MiBandConstants.SERVICE_MILI));
+
+        gatt.readCharacteristic(gatt.getService(MiBandConstants.SERVICE_MILI).getCharacteristic(MiBandConstants.UUID_INFO));
+    }
+
+    private void fillMap(BluetoothGattService service) {
+        BluetoothGattCharacteristic characteristic;
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_DEVICE_NAME);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_USER_INFO);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_CONTROL_POINT);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_REALTIME_STEPS);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_ACTIVITY);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_LE_PARAMS);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_BATTERY);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_PAIR);
+        map.put(characteristic.getUuid(), characteristic);
+
+        characteristic = service.getCharacteristic(MiBandConstants.UUID_INFO);
+        map.put(characteristic.getUuid(), characteristic);
     }
 
 }

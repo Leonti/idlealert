@@ -7,10 +7,10 @@
 
     <TextView android:layout_width="fill_parent"
         android:layout_height="fill_parent"
-        android:layout_alignParentTop="true"
         android:layout_alignParentStart="true"
         android:id="@+id/debug_log"
-        android:layout_above="@+id/button_refresh" />
+        android:layout_above="@+id/button_refresh"
+        android:layout_below="@+id/textView2" />
 
     <Button
         android:layout_width="wrap_content"
@@ -19,5 +19,85 @@
         android:id="@+id/button_refresh"
         android:layout_alignParentBottom="true"
         android:layout_alignEnd="@+id/debug_log" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="New Button"
+        android:id="@+id/button_toggle"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Battery:"
+        android:id="@+id/textView_battery_label"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:id="@+id/textView_battery"
+        android:text="battery"
+        android:layout_alignParentTop="true"
+        android:layout_alignStart="@+id/textView_steps" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Steps:"
+        android:id="@+id/textView_steps_label"
+        android:layout_below="@+id/textView_battery_label"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:id="@+id/textView_steps"
+        android:text="steps"
+        android:layout_below="@+id/textView_battery"
+        android:layout_toEndOf="@+id/button_toggle" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Left:"
+        android:id="@+id/textView_left_label"
+        android:layout_below="@+id/textView_steps_label"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/textView_left"
+        android:layout_below="@+id/textView_steps"
+        android:layout_alignStart="@+id/textView_steps" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="When:"
+        android:id="@+id/textView2"
+        android:layout_below="@+id/textView_left_label"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/textView_when"
+        android:layout_below="@+id/textView_left"
+        android:layout_alignStart="@+id/textView_left" />
 
 </RelativeLayout>
