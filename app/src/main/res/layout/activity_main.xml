@@ -9,24 +9,16 @@
         android:layout_height="fill_parent"
         android:layout_alignParentStart="true"
         android:id="@+id/debug_log"
-        android:layout_above="@+id/button_refresh"
         android:layout_below="@+id/textView2" />
 
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Refresh"
-        android:id="@+id/button_refresh"
-        android:layout_alignParentBottom="true"
-        android:layout_alignEnd="@+id/debug_log" />
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:text="New Button"
-        android:id="@+id/button_toggle"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentStart="true" />
+        android:id="@+id/button_stop"
+        android:layout_alignBottom="@+id/debug_log"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="158dp" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -42,7 +34,6 @@
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/textView_battery"
-        android:text="battery"
         android:layout_alignParentTop="true"
         android:layout_alignStart="@+id/textView_steps" />
 
@@ -60,9 +51,8 @@
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/textView_steps"
-        android:text="steps"
         android:layout_below="@+id/textView_battery"
-        android:layout_toEndOf="@+id/button_toggle" />
+        android:layout_toEndOf="@+id/button_stop" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -77,7 +67,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Large Text"
         android:id="@+id/textView_left"
         android:layout_below="@+id/textView_steps"
         android:layout_alignStart="@+id/textView_steps" />
@@ -95,9 +84,18 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Large Text"
         android:id="@+id/textView_when"
         android:layout_below="@+id/textView_left"
         android:layout_alignStart="@+id/textView_left" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Reading data from MiBand ..."
+        android:id="@+id/textView_reading"
+        android:layout_below="@+id/textView_when"
+        android:layout_alignParentStart="true"
+        android:layout_alignEnd="@+id/debug_log" />
 
 </RelativeLayout>

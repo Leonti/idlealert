@@ -2,10 +2,13 @@ package rocks.leonti.idlealert;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.Menu;
@@ -17,77 +20,69 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import rocks.leonti.idlealert.model.Check;
-import rocks.leonti.idlealert.model.MiBand;
-
 
 public class MainActivity extends Activity {
 
     private static String TAG = "MainActivity";
-    private static String STARTED = "started";
-    private static String BATTERY = "battery";
-    private static String STEPS = "steps";
-    private static String LEFT = "left";
-    private static String WHEN = "when";
 
-    private boolean started = false;
-    private String batteryLabel = "";
-    private String stepsLabel = "";
-    private String leftLabel = "";
-    private String whenLabel = "";
+    CheckService checkService;
+    boolean isServiceBound = false;
+
+    public ServiceConnection checkServiceConnection = new ServiceConnection() {
+        public void onServiceConnected(ComponentName className, IBinder binder) {
+            Log.d("ServiceConnection","connected");
+            checkService = ((CheckService.CheckServiceBinder) binder).getService();
+
+            isServiceBound = true;
+
+            if (checkService.getStatus().isPresent()) {
+                updateTextFields(checkService.getStatus().get());
+            } else {
+                Log.i("MAIN ACTIVITY", "status is not present");
+            }
+        }
+
+        public void onServiceDisconnected(ComponentName className) {
+            Log.d("ServiceConnection","disconnected");
+            checkService = null;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        if (savedInstanceState != null) {
-            started = savedInstanceState.getBoolean(STARTED);
-            batteryLabel = savedInstanceState.getString(BATTERY);
-            stepsLabel = savedInstanceState.getString(STEPS);
-            leftLabel = savedInstanceState.getString(LEFT);
-            whenLabel = savedInstanceState.getString(WHEN);
-        }
-
-        final Button buttonToggle = (Button) findViewById(R.id.button_toggle);
-        buttonToggle.setText(started ? "Stop" : "Start");
+        final Button buttonToggle = (Button) findViewById(R.id.button_stop);
+        buttonToggle.setText("Stop");
         buttonToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Log.i(TAG, "Stopping service and closing");
 
-                if (started) {
-                    CheckService.cancel(MainActivity.this);
-                    buttonToggle.setText("Start");
-                    started = false;
-                } else {
-                    CheckDao checkDao = new CheckDao(MainActivity.this);
-                    checkDao.resetCheck();
-                    CheckService.schedule(MainActivity.this, 0);
-                    buttonToggle.setText("Stop");
-                    started = true;
-                }
+                unbindService(checkServiceConnection);
+                isServiceBound = false;
 
+                stopService(new Intent(MainActivity.this, CheckService.class));
+
+                MainActivity.this.finish();
             }
         });
 
-        updateTextFields();
     }
 
-    private void updateTextFields() {
-        ((TextView) findViewById(R.id.textView_battery)).setText(batteryLabel);
-        ((TextView) findViewById(R.id.textView_steps)).setText(stepsLabel);
-        ((TextView) findViewById(R.id.textView_left)).setText(leftLabel);
-        ((TextView) findViewById(R.id.textView_when)).setText(whenLabel);
+    private void updateTextFields(CheckService.Status status) {
+        Log.i("MAIN ACTIVITY", "Updating UI");
+
+        ((TextView) findViewById(R.id.textView_reading)).setText("");
+        ((TextView) findViewById(R.id.textView_battery)).setText(status.battery + "%");
+        ((TextView) findViewById(R.id.textView_steps)).setText(status.steps + "");
+        ((TextView) findViewById(R.id.textView_left)).setText(status.getStepsLeft() + "");
+        ((TextView) findViewById(R.id.textView_when)).setText(new SimpleDateFormat("HH:mm").format(new Date(status.timestamp)));
     }
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
-        savedInstanceState.putBoolean(STARTED, started);
-        savedInstanceState.putString(BATTERY, batteryLabel);
-        savedInstanceState.putString(STEPS, stepsLabel);
-        savedInstanceState.putString(LEFT, leftLabel);
-        savedInstanceState.putString(WHEN, whenLabel);
-
         super.onSaveInstanceState(savedInstanceState);
     }
 
@@ -100,7 +95,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onResume() {
-        LocalBroadcastManager.getInstance(this).registerReceiver(updatesReceiver, new IntentFilter("custom-event-name"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(updatesReceiver, new IntentFilter("status-update"));
         super.onResume();
     }
 
@@ -110,23 +105,36 @@ public class MainActivity extends Activity {
 
             Log.i(TAG, "Received broadcast '" + intent.getStringExtra("type") + "'");
 
-            if (intent.getStringExtra("type").equals("hardware")) {
-                batteryLabel = intent.getStringExtra("battery") + "%";
-                stepsLabel = intent.getStringExtra("steps");
-            } else if (intent.getStringExtra("type").equals("check")) {
-                leftLabel = intent.getStringExtra("left");
+            if (checkService.getStatus().isPresent()) {
+                updateTextFields(checkService.getStatus().get());
+            } else {
+                Log.i("MAIN ACTIVITY", "received broadcast, but status is not present");
             }
-
-            whenLabel = new SimpleDateFormat("HH:mm").format(new Date());
-            updateTextFields();
         }
     };
+
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Intent intent = new Intent(this, CheckService.class);
+        startService(intent);
+        bindService(intent, checkServiceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (isServiceBound) {
+            unbindService(checkServiceConnection);
+            isServiceBound = false;
+        }
+    }
 
     private void println(String line) {
         TextView debug_log = (TextView) findViewById(R.id.debug_log);
         debug_log.setText(debug_log.getText() + line + "\n");
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
