@@ -58,7 +58,7 @@ public class CheckService extends Service {
                 return 0;
             }
 
-            int stepsLeft = (steps - previousCheckSteps) - REQUIRED_STEPS;
+            int stepsLeft = REQUIRED_STEPS - (steps - previousCheckSteps);
 
             return stepsLeft < 0 ? 0 : stepsLeft;
         }
@@ -119,17 +119,18 @@ public class CheckService extends Service {
             if (lastCheck.isPresent()) {
                 Log.i(TAG, "Last status is there: " + check.get());
 
+                this.status = Optional.of(new Status(check.get().steps, lastCheck.get().steps, check.get().batteryLevel, check.get().timestamp));
+
                 // give a timer 2 seconds because it's not always precise
                 if (now() - lastCheck.get().timestamp >= CHECK_INTERVAL) {
 
-                    if (check.get().steps - lastCheck.get().steps < REQUIRED_STEPS) {
+                    if (this.status.get().getStepsLeft() > 0) {
                         Log.i(TAG, "Steps done after last check (" + (check.get().steps - lastCheck.get().steps)
                                 + ") are less than required amount (" + REQUIRED_STEPS + "), rescheduling");
 
                         showNotification();
                         scheduleRecheck();
 
-                        status = Optional.of(new Status(check.get().steps, lastCheck.get().steps, check.get().batteryLevel, check.get().timestamp));
                     } else {
                         Log.i(TAG, "Steps done after last check (" + (check.get().steps - lastCheck.get().steps)
                                 + ") are more than required amount (" + REQUIRED_STEPS + "), scheduling next check");
@@ -138,7 +139,6 @@ public class CheckService extends Service {
                         scheduleCheck();
                     }
 
-                    this.status = Optional.of(new Status(check.get().steps, lastCheck.get().steps, check.get().batteryLevel, check.get().timestamp));
                     broadcastUpdate();
                 } else {
                     Log.i(TAG, "Less than check interval " + (now() - lastCheck.get().timestamp));
@@ -146,7 +146,7 @@ public class CheckService extends Service {
             } else {
                 lastCheck = check;
                 scheduleCheck();
-                status = Optional.of(new Status(check.get().steps, 0, check.get().batteryLevel, check.get().timestamp));
+                this.status = Optional.of(new Status(check.get().steps, 0, check.get().batteryLevel, check.get().timestamp));
                 broadcastUpdate();
             }
 
