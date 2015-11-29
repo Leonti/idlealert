@@ -27,20 +27,17 @@ import rocks.leonti.idlealert.model.MiBand;
 public class CheckService extends Service {
 
     public static String TAG = "CHECK SERVICE";
-    
+
     public static int REQUIRED_STEPS = 100;
-    public static long CHECK_INTERVAL = 25 * 60 * 1000;
+    public static long CHECK_INTERVAL = 30 * 60 * 1000;
     public static long RECHECK_INTERVAL = 60 * 1000;
 
-
     private IBinder mBinder = new CheckServiceBinder();
-
-    /*
+/*
     public static int REQUIRED_STEPS = 10;
     public static long CHECK_INTERVAL = 60 * 1000;
     public static long RECHECK_INTERVAL = 30 * 1000;
 */
-
     private Optional<Check> lastCheck = Optional.absent();
 
     public static class Status {
@@ -122,7 +119,8 @@ public class CheckService extends Service {
             if (lastCheck.isPresent()) {
                 Log.i(TAG, "Last status is there: " + check.get());
 
-                if (now() - check.get().timestamp >= CHECK_INTERVAL) {
+                // give a timer 2 seconds because it's not always precise
+                if (now() - lastCheck.get().timestamp >= CHECK_INTERVAL) {
 
                     if (check.get().steps - lastCheck.get().steps < REQUIRED_STEPS) {
                         Log.i(TAG, "Steps done after last check (" + (check.get().steps - lastCheck.get().steps)
@@ -142,6 +140,8 @@ public class CheckService extends Service {
 
                     this.status = Optional.of(new Status(check.get().steps, lastCheck.get().steps, check.get().batteryLevel, check.get().timestamp));
                     broadcastUpdate();
+                } else {
+                    Log.i(TAG, "Less than check interval " + (now() - lastCheck.get().timestamp));
                 }
             } else {
                 lastCheck = check;
