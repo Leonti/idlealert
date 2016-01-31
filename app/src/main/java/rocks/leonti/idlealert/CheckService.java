@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.IBinder;
@@ -100,13 +101,13 @@ public class CheckService extends Service {
     }
 
     private static Notification createNotification(Context context) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context);
-        builder.setAutoCancel(false);
-        builder.setOngoing(true);
-        builder.setContentTitle("Idle Alert");
-        builder.setContentText("Some stats");
-        builder.setSmallIcon(R.drawable.ic_stat_action_movement);
-        builder.setContentIntent(PendingIntent.getActivity(context, 1, new Intent(context, MainActivity.class), 0));
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .setContentTitle("Idle Alert is running")
+            .setContentText("")
+            .setSmallIcon(R.drawable.ic_stat_action_movement)
+            .setContentIntent(PendingIntent.getActivity(context, 1, new Intent(context, MainActivity.class), 0));
 
         return builder.build();
     }
@@ -135,6 +136,7 @@ public class CheckService extends Service {
                         Log.i(TAG, "Steps done after last check (" + (check.get().steps - lastCheck.get().steps)
                                 + ") are more than required amount (" + REQUIRED_STEPS + "), scheduling next check");
 
+                        lastCheck = check;
                         hideNotification(43);
                         scheduleCheck();
                     }
@@ -223,7 +225,9 @@ public class CheckService extends Service {
                 .setAutoCancel(true)
                 .setContentTitle("Idle Alert") // title for notification
                 .setContentText("Move your ass!")
-                .setContentIntent(PendingIntent.getActivity(this, 1, new Intent(this, MainActivity.class), 0));
+                .setContentIntent(PendingIntent.getActivity(this, 1, new Intent(this, MainActivity.class), 0))
+                .setPriority(Notification.PRIORITY_DEFAULT)
+                .setLights(Color.MAGENTA, 400, 400);
 
         NotificationManager mNotificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);

@@ -1,6 +1,4 @@
 <resources>
-    <string name="app_name">IdleAlert</string>
-
-    <string name="hello_world">Hello world!</string>
+    <string name="app_name">Idle Alert</string>
     <string name="action_settings">Settings</string>
 </resources>
